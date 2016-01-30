@@ -86,6 +86,7 @@
  * Device path /dev/dio/out/0
  */
 static int32_t fd_out;
+static int32_t fd_in;
 
 /*==================[external data definition]===============================*/
 
@@ -130,6 +131,8 @@ int main(void)
  * http://portal.osek-vdx.org/files/pdf/specs/os223.pdf
  *
  */
+uint8_t COLORINIT = 0x00;
+uint8_t prendido = 0;
 void ErrorHook(void)
 {
    ciaaPOSIX_printf("ErrorHook was called\n");
@@ -152,11 +155,15 @@ TASK(InitTask)
    /* open CIAA digital outputs */
    fd_out = ciaaPOSIX_open("/dev/dio/out/0", ciaaPOSIX_O_RDWR);
 
+   /*Open CIAA Buttons */
+   fd_in = ciaaPOSIX_open("/dev/dio/in/0", ciaaPOSIX_O_RDONLY);
+
    /* activate periodic task:
     *  - for the first time after 350 ticks (350 ms)
     *  - and then every 250 ticks (250 ms)
     */
-   SetRelAlarm(ActivatePeriodicTask, 350, 600);
+   SetRelAlarm(ActivatePeriodicTask, 350, 250);
+   SetRelAlarm(ActivateSwitchTask, 350, 50);
 
    /* terminate task */
    TerminateTask();
@@ -172,18 +179,42 @@ TASK(PeriodicTask)
 {
    uint8_t outputs;
 
+
    /* write blinking message */
    ciaaPOSIX_printf("Blinking\n");
-
+   
+   
+   if (prendido == 1){
    /* blink output */
    ciaaPOSIX_read(fd_out, &outputs, 1);
-   outputs ^= 0x07;
+   COLORINIT = COLORINIT + 0x01; 
+   if(COLORINIT > 0x3F){
+	COLORINIT = 0x01;
+   } 
+   outputs ^= COLORINIT;
    ciaaPOSIX_write(fd_out, &outputs, 1);
 
+   }
+   else{
+      /*ciaaPOSIX_read(fd_out, &outputs, 1);
+      outputs ^= 0x00;
+      ciaaPOSIX_write(fd_out, &outputs, 1);*/
+   }
+   
    /* terminate task */
    TerminateTask();
 }
-
+TASK(SwitchTask){
+   uint8_t inputs;
+   inputs ^= ciaaPOSIX_read(fd_in, &inputs, 1);
+   if((inputs&0x01) == 1){
+      prendido = 1;
+   }
+   if((inputs&0x02) == 2){
+      prendido = 0;
+   }
+   TerminateTask();
+}
 /** @} doxygen end group definition */
 /** @} doxygen end group definition */
 /** @} doxygen end group definition */
