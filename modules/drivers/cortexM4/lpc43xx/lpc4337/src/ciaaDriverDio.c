@@ -88,17 +88,34 @@ typedef struct  {
  *
  * Define port/pin pairs for each GPIO managed by this driver
  */
-#if (ciaa_nxp == BOARD)
-const ciaaDriverDio_dioType ciaaDriverDio_Inputs[] = { {2,0},{2,1},{2,2},{2,3},{3,11},{3,12},{3,13},{3,14} };
-const ciaaDriverDio_dioType ciaaDriverDio_Outputs[] =  { {5,1},{2,6},{2,5},{2,4},{5,12},{5,13},{5,14},{1,8} };
-#elif (edu_ciaa_nxp == BOARD)
+//#if (ciaa_nxp == BOARD)
+//const ciaaDriverDio_dioType ciaaDriverDio_Inputs[] = { {2,0},{2,1},{2,2},{2,3},{3,11},{3,12},{3,13},{3,14} };
+//const ciaaDriverDio_dioType ciaaDriverDio_Outputs[] =  { {5,1},{2,6},{2,5},{2,4},{5,12},{5,13},{5,14},{1,8} };
+//#elif (edu_ciaa_nxp == BOARD)
 const ciaaDriverDio_dioType ciaaDriverDio_Inputs[] = { {0,4},{0,8},{0,9},{1,9} };
-const ciaaDriverDio_dioType ciaaDriverDio_Outputs[] =  { {5,0},{5,1},{5,2},{0,14},{1,11},{1,12} };
-#endif
+const ciaaDriverDio_dioType ciaaDriverDio_Outputs[] =  { {5,0},{5,1},{5,2},{0,14},{1,11},{1,12},
+													  	// Defino pines de los GPIO fisico de la CIAA
+														// 6,    7,    8,     9,    10,   11,   12,   13,   14 <== numeros de salidas
+														{3,0},{3,3},{3,4},{5,15},{5,16},{3,5},{3,6},{3,7},{2,8} };
+//#endif
 
 /** \brief Device for DIO 0 */
 static ciaaDevices_deviceType ciaaDriverDio_in0 = {
    "in/0",                          /** <= driver name */
+   ciaaDriverDio_open,             /** <= open function */
+   ciaaDriverDio_close,            /** <= close function */
+   ciaaDriverDio_read,             /** <= read function */
+   ciaaDriverDio_write,            /** <= write function */
+   ciaaDriverDio_ioctl,            /** <= ioctl function */
+   NULL,                           /** <= seek function is not provided */
+   NULL,                           /** <= upper layer */
+   NULL,                           /** <= layer */
+   NULL                            /** <= NULL no lower layer */
+};
+
+/** \brief Device for DIO 3 */
+static ciaaDevices_deviceType ciaaDriverDio_in1 = {
+   "in/1",                          /** <= driver name */
    ciaaDriverDio_open,             /** <= open function */
    ciaaDriverDio_close,            /** <= close function */
    ciaaDriverDio_read,             /** <= read function */
@@ -126,12 +143,14 @@ static ciaaDevices_deviceType ciaaDriverDio_out0 = {
 
 static ciaaDevices_deviceType * const ciaaDioDevices[] = {
    &ciaaDriverDio_in0,
-   &ciaaDriverDio_out0
+   &ciaaDriverDio_out0,
+   &ciaaDriverDio_in1
+
 };
 
 static ciaaDriverConstType const ciaaDriverDioConst = {
    ciaaDioDevices,
-   2
+   3
 };
 
 /*==================[external data definition]===============================*/
@@ -188,6 +207,7 @@ static void ciaa_lpc4337_gpio_init(void)
    Chip_SCU_PinMux(1,2,MD_PUP|MD_EZI|MD_ZI,FUNC0); /* GPIO0[9], SW3 */
    Chip_SCU_PinMux(1,6,MD_PUP|MD_EZI|MD_ZI,FUNC0); /* GPIO1[9], SW4 */
 
+
    Chip_GPIO_SetDir(LPC_GPIO_PORT, 0,(1<<4)|(1<<8)|(1<<9),0);
    Chip_GPIO_SetDir(LPC_GPIO_PORT, 1,(1<<9),0);
 
@@ -199,13 +219,19 @@ static void ciaa_lpc4337_gpio_init(void)
    Chip_SCU_PinMux(2,11,MD_PUP|MD_EZI,FUNC0); /* GPIO1[11], LED2 */
    Chip_SCU_PinMux(2,12,MD_PUP|MD_EZI,FUNC0); /* GPIO1[12], LED3 */
 
+   Chip_SCU_PinMux(3,0,MD_PUP|MD_EZI,FUNC0); /* GPIO0 CIAA */
+
    Chip_GPIO_SetDir(LPC_GPIO_PORT, 5,(1<<0)|(1<<1)|(1<<2),1);
    Chip_GPIO_SetDir(LPC_GPIO_PORT, 0,(1<<14),1);
    Chip_GPIO_SetDir(LPC_GPIO_PORT, 1,(1<<11)|(1<<12),1);
 
+   Chip_GPIO_SetDir(LPC_GPIO_PORT, 6, 1, 1);
+
    Chip_GPIO_ClearValue(LPC_GPIO_PORT, 5,(1<<0)|(1<<1)|(1<<2));
    Chip_GPIO_ClearValue(LPC_GPIO_PORT, 0,(1<<14));
    Chip_GPIO_ClearValue(LPC_GPIO_PORT, 1,(1<<11)|(1<<12));
+
+   Chip_GPIO_ClearValue(LPC_GPIO_PORT, 6, 1);
 
 #else
    #error please define BOARD variable!
@@ -365,6 +391,10 @@ extern ssize_t ciaaDriverDio_write(ciaaDevices_deviceType const * const device, 
          {
             j++;
          }
+
+         // Hardcodeo
+         ciaa_lpc4337_writeOutput(6, 0);
+
          ret = j;
       }
       else
